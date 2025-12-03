@@ -23,10 +23,9 @@ class Dense(Layer):
     outputs: (batch_size, output_dim)
     """
     def __init__(self, input_dim, output_dim):
-        # Xavier/Glorot initialization
-        limit = np.sqrt(6 / (input_dim + output_dim))
+        limit = np.sqrt(6.0 / (input_dim + output_dim))
         self.W = np.random.uniform(-limit, limit, (input_dim, output_dim))
-        self.b = np.zeros((1, output_dim))
+        self.b = np.zeros((1, output_dim), dtype=np.float64)
 
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)
@@ -38,15 +37,21 @@ class Dense(Layer):
         return inputs @ self.W + self.b  # (batch_size, output_dim)
 
     def backward(self, grad_output):
-        # grad_output: (batch_size, output_dim)
-        batch_size = self.inputs.shape[0]
+        """
+        grad_output is dL/dY, already averaged by the loss.
+        DO NOT divide by batch size again here.
+        """
+        # Gradients w.r.t parameters
+        dW = self.inputs.T @ grad_output          # (input_dim, output_dim)
+        db = np.sum(grad_output, axis=0, keepdims=True)  # (1, output_dim)
 
-        # Gradients w.r.t. weights and biases
-        self.dW = self.inputs.T @ grad_output / batch_size
-        self.db = np.sum(grad_output, axis=0, keepdims=True) / batch_size
+        # Update gradient buffers IN PLACE so optimizer sees them
+        self.dW[...] = dW
+        self.db[...] = db
+
 
         # Gradient w.r.t. inputs
-        grad_input = grad_output @ self.W.T  # (batch_size, input_dim)
+        grad_input = grad_output @ self.W.T            # (batch_size, input_dim)
         return grad_input
 
     def parameters(self):
